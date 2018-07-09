@@ -9,6 +9,8 @@ import matplotlib; matplotlib.use('Agg')  # noqa; for systems without X11
 from matplotlib.backends.backend_pdf import PdfPages
 import pylab as plt
 
+from lib.parsev3bw import v3bw_fd_into_xy
+
 colors = "krbgcmy"
 
 plt.rcParams.update({
@@ -30,6 +32,24 @@ def get_all_values_from_fd(fd):
     return values
 
 
+def _get_data(inputs):
+    data = {}
+    for fname, label in inputs:
+        assert label not in data, 'Already have input file with label '\
+            '%s' % label
+        data[label] = {
+            'label': label,
+            'data': [],
+        }
+        with open(fname, 'rt') as fd:
+            for fp, bw in v3bw_fd_into_xy(fd):
+                if fp in data[label]['data']:
+                    print('Already saw fp %s in %s. Overwriting' %
+                          fp[0:8], label)
+                data[label]['data'].append((fp, bw))
+    return data
+
+
 def common_elements(l1, l2):
     ret = set()
     for item in l1:
@@ -42,14 +62,8 @@ def main(args, pdf):
     plt.figure()
     data = {}
     # Read all data in
-    all_labels = []
-    for fname, label in args.input:
-        with open(fname, 'rt') as fd:
-            data[label] = {
-                'label': label,
-                'data': get_all_values_from_fd(fd)
-            }
-            all_labels.append(label)
+    data = _get_data(args.input)
+    all_labels = list(data.keys())
     # Determine what relay fingerprints have data from all input sources
     common_fingerprints = None
     for label1 in data:
@@ -124,8 +138,8 @@ def main(args, pdf):
 
 
 if __name__ == '__main__':
-    d = 'Takes one or more lists of (fingerprint, bandwidth) points, 1 per '\
-        'line, and plots a scatter plot of them. Data points are sorted by '\
+    d = 'Takes one or more v3bw files and plots a scatter plot of the '\
+        'bandwidths in them. Data points are sorted by '\
         'the first input\'s bandwidth values, thus this script can be used '\
         'to visually determine how similar the results are from various '\
         'instances of a bandwidth scanner, or even across different '\
